@@ -11,7 +11,9 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ALLOWED_HOSTS = ['*']
 
-ALLOWED_HOSTS = ['*', 'fedsecure.onrender.com']
+# ALLOWED_HOSTS = ['*', 'fedsecure.onrender.com']
+
+ALLOWED_HOSTS = ['fedsecure.onrender.com', 'localhost', '127.0.0.1']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
