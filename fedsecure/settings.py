@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'fedsecure-local-dev-secret-key-change-in-production'
 
-DEBUG = True
+# DEBUG = True
 
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
