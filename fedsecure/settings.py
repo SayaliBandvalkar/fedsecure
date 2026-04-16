@@ -13,7 +13,12 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ALLOWED_HOSTS = ['*', 'fedsecure.onrender.com']
 
-ALLOWED_HOSTS = ['fedsecure.onrender.com', 'localhost', '127.0.0.1']
+# ALLOWED_HOSTS = ['fedsecure.onrender.com', 'localhost', '127.0.0.1']
+
+ALLOWED_HOSTS = [
+    "fedsecure.onrender.com",
+    ".onrender.com"
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -80,6 +85,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -89,3 +95,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
