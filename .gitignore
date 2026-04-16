@@ -1,9 +1,42 @@
+# venv/
+# __pycache__/
+# *.pyc
+# *.pyo
+# db.sqlite3
+# staticfiles/
+# media/uploads/*
+# .env
+# *.log
+
+
+
+
+
+
+# Virtual environment
 venv/
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
+
+# Database
 db.sqlite3
+
+# Static & media
 staticfiles/
 media/uploads/*
+
+# Environment variables
 .env
+
+# Logs
 *.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code (optional)
+.vscode/
