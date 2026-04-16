@@ -25,6 +25,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONUNBUFFERED=1
 
 # Collect static safely
-RUN python manage.py collectstatic --noinput || true
+RUN python manage.py collectstatic --noinput 
 
 CMD ["gunicorn", "fedsecure.wsgi:application", "--bind", "0.0.0.0:8000"]
