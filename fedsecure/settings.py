@@ -15,9 +15,16 @@ DEBUG = True
 
 # ALLOWED_HOSTS = ['fedsecure.onrender.com', 'localhost', '127.0.0.1']
 
+# ALLOWED_HOSTS = [
+#     "fedsecure.onrender.com",
+#     ".onrender.com"
+# ]
+
 ALLOWED_HOSTS = [
     "fedsecure.onrender.com",
-    ".onrender.com"
+    ".onrender.com",
+    "127.0.0.1",
+    "localhost"
 ]
 
 INSTALLED_APPS = [
