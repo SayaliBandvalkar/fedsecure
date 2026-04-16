@@ -7,7 +7,11 @@ SECRET_KEY = 'fedsecure-local-dev-secret-key-change-in-production'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+DEBUG = os.environ.get("DEBUG", "False") == "True"
+
+# ALLOWED_HOSTS = ['*']
+
+ALLOWED_HOSTS = ['*', 'fedsecure.onrender.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
