@@ -1,0 +1,248 @@
+{% extends 'core/base.html' %}
+{% block title %}FL Training Monitor{% endblock %}
+{% block page_title %}🔄 Federated Training Monitor{% endblock %}
+{% block page_sub %}Run and monitor federated learning rounds{% endblock %}
+
+{% block extra_head %}
+<style>
+.training-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
+.training-panel-title{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.rounds-config{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end}
+.round-input{display:flex;align-items:center;gap:16px}
+.round-slider{-webkit-appearance:none;width:200px;height:6px;border-radius:3px;background:var(--border2);outline:none}
+.round-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer}
+.progress-section{display:none}
+.progress-section.show{display:block}
+.big-progress{height:12px;background:var(--border);border-radius:6px;overflow:hidden;margin:10px 0}
+.big-progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));border-radius:6px;transition:width 0.5s ease;width:0%}
+.round-log{max-height:160px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);background:var(--bg2);border-radius:8px;padding:12px;margin-top:10px}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.log-line.success{color:var(--green)}
+.log-line.info{color:var(--accent)}
+.log-line.warn{color:var(--orange)}
+
+.round-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);transition:background 0.15s}
+.round-row:hover{background:rgba(255,255,255,0.02)}
+.round-num{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);width:60px;font-size:13px}
+.round-acc{flex:1}
+.round-acc-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px}
+.round-acc-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:3px}
+.round-metrics{display:flex;gap:16px;font-size:12px;color:var(--text3);font-family:'JetBrains Mono',monospace;width:280px}
+.round-metric{flex:1; text-align:center}
+.round-metric strong{display:block;color:var(--text);font-size:13px}
+.round-clients{width:60px;text-align:center;font-size:12px;color:var(--text3)}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Training Control Panel -->
+<div class="training-panel">
+  <div class="training-panel-title">⚡ Launch Federated Training</div>
+  <p style="font-size:13px;color:var(--text3);margin-bottom:16px">
+    Click <strong style="color:var(--text)">Start Training</strong> to simulate a federated learning session.
+    Each round: clients train locally → send gradients → server aggregates → global model improves.
+  </p>
+  <div class="rounds-config">
+    <div>
+      <label class="form-label">Number of Rounds</label>
+      <div class="round-input">
+        <input type="range" class="round-slider" id="roundsSlider" min="1" max="20" value="5" oninput="document.getElementById('roundsVal').textContent=this.value">
+        <span id="roundsVal" style="font-size:24px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace;min-width:32px">5</span>
+        <span style="color:var(--text3);font-size:13px">rounds</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="trainBtn" onclick="startTraining()">▶ Start Federated Training</button>
+  </div>
+
+  <div class="progress-section" id="progressSection">
+    <div style="margin-top:16px;display:flex;justify-content:space-between;font-size:13px;color:var(--text2)">
+      <span id="progressLabel">Initializing...</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="big-progress">
+      <div class="big-progress-bar" id="progressBar"></div>
+    </div>
+    <div class="round-log" id="trainingLog"></div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="grid-2" style="margin-bottom:24px">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Global Model Accuracy by Round</div>
+        <div class="chart-sub">FL convergence curve</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="accuracyChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Precision / Recall by Round</div>
+        <div class="chart-sub">Detection quality metrics</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="prChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Rounds Table -->
+<div class="chart-card">
+  <div class="chart-header">
+    <div class="chart-title">Federated Rounds History</div>
+    <div class="chart-sub">All completed training rounds</div>
+  </div>
+  {% if rounds %}
+  <div style="margin-top:8px">
+    <div style="display:flex;padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border)">
+      <div style="width:60px">Round</div>
+      <div style="flex:1">Accuracy</div>
+      <div style="width:280px;display:flex;gap:16px">
+        <span style="flex:1;text-align:center">Precision</span>
+        <span style="flex:1;text-align:center">Recall</span>
+        <span style="flex:1;text-align:center">F1</span>
+      </div>
+      <div style="width:60px;text-align:center">Clients</div>
+    </div>
+    {% for round in rounds %}
+    <div class="round-row">
+      <div class="round-num">R{{ round.round_number }}</div>
+      <div class="round-acc">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:var(--text2)">Global Accuracy</span>
+          <span style="color:var(--accent);font-family:'JetBrains Mono',monospace">{{ round.global_accuracy }}%</span>
+        </div>
+        <div class="round-acc-bar">
+          <div class="round-acc-fill" style="width:{{ round.global_accuracy }}%"></div>
+        </div>
+      </div>
+      <div class="round-metrics">
+        <div class="round-metric"><strong>{{ round.precision }}%</strong>Precision</div>
+        <div class="round-metric"><strong>{{ round.recall }}%</strong>Recall</div>
+        <div class="round-metric"><strong>{{ round.f1_score }}%</strong>F1</div>
+      </div>
+      <div class="round-clients">{{ round.participating_clients }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:40px;color:var(--text3)">
+    No training rounds yet. Click <strong style="color:var(--accent)">Start Federated Training</strong> above.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const roundLabels = {{ round_labels|safe }};
+const roundAccuracies = {{ round_accuracies|safe }};
+const roundPrecision = {{ round_precision|safe }};
+const roundRecall = {{ round_recall|safe }};
+
+new Chart(document.getElementById('accuracyChart'), {
+  type: 'line',
+  data: {
+    labels: roundLabels,
+    datasets: [{
+      label: 'Global Accuracy %',
+      data: roundAccuracies,
+      borderColor: '#00d4ff',
+      backgroundColor: 'rgba(0,212,255,0.12)',
+      fill: true, tension: 0.4,
+      pointBackgroundColor: '#00d4ff', pointRadius: 5,
+    }]
+  },
+  options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{y:{min:70,max:100,grid:{color:'rgba(255,255,255,0.05)'}},x:{grid:{color:'rgba(255,255,255,0.03)'}}}}
+});
+
+new Chart(document.getElementById('prChart'), {
+  type: 'line',
+  data: {
+    labels: roundLabels,
+    datasets: [
+      {label:'Precision',data:roundPrecision,borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,0.08)',fill:true,tension:0.4,pointRadius:4},
+      {label:'Recall',data:roundRecall,borderColor:'#00ff88',backgroundColor:'rgba(0,255,136,0.08)',fill:true,tension:0.4,pointRadius:4},
+    ]
+  },
+  options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{padding:12,font:{size:11}}}},
+    scales:{y:{min:70,max:100,grid:{color:'rgba(255,255,255,0.05)'}},x:{grid:{color:'rgba(255,255,255,0.03)'}}}}
+});
+
+const logLines = [
+  {text:'[FedSecure] Initializing federated learning session...', cls:'info'},
+  {text:'[Server] Global model initialized with random weights', cls:'info'},
+  {text:'[Privacy] Differential privacy noise ε=1.0 applied', cls:'info'},
+  {text:'[Client 1] Local training started (5240 samples)', cls:''},
+  {text:'[Client 2] Local training started (4810 samples)', cls:''},
+  {text:'[Client 3] Local training started (6100 samples)', cls:''},
+  {text:'[Server] Aggregating model updates via FedAvg...', cls:'warn'},
+  {text:'[Server] Round complete — global model updated', cls:'success'},
+];
+
+async function startTraining(){
+  const rounds = parseInt(document.getElementById('roundsSlider').value);
+  const btn = document.getElementById('trainBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Training...';
+  btn.style.opacity = '0.7';
+
+  const section = document.getElementById('progressSection');
+  section.classList.add('show');
+  const log = document.getElementById('trainingLog');
+  const bar = document.getElementById('progressBar');
+  const label = document.getElementById('progressLabel');
+  const pct = document.getElementById('progressPct');
+
+  log.innerHTML = '';
+
+  // Show fake log entries
+  let logIdx = 0;
+  const logInterval = setInterval(()=>{
+    if(logIdx < logLines.length){
+      const l = logLines[logIdx];
+      log.innerHTML += `<div class="log-line ${l.cls}">> ${l.text}</div>`;
+      log.scrollTop = log.scrollHeight;
+      logIdx++;
+    } else {
+      clearInterval(logInterval);
+    }
+  }, 600);
+
+  // Call API
+  label.textContent = `Running ${rounds} federated rounds...`;
+  try {
+    const r = await apiPost('/api/run-training/', {rounds});
+    if(r.status === 'success'){
+      // Animate progress
+      let p = 0;
+      const step = 100 / rounds;
+      for(let i = 0; i < rounds; i++){
+        await new Promise(res => setTimeout(res, 400));
+        p = Math.min(100, (i+1) * step);
+        bar.style.width = p + '%';
+        pct.textContent = Math.round(p) + '%';
+        label.textContent = `Round ${r.result[i]?.round||i+1} complete — Accuracy: ${r.result[i]?.accuracy||'—'}%`;
+        log.innerHTML += `<div class="log-line success">> [Round ${r.result[i]?.round}] accuracy=${r.result[i]?.accuracy}% f1=${r.result[i]?.f1}%</div>`;
+        log.scrollTop = log.scrollHeight;
+      }
+      showToast(`✅ Training complete! ${rounds} rounds finished.`, 'success');
+      setTimeout(()=>location.reload(), 1500);
+    } else {
+      showToast(r.message || 'Training failed', 'error');
+    }
+  } catch(e) {
+    showToast('Server error during training', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '▶ Start Federated Training';
+  btn.style.opacity = '1';
+  clearInterval(logInterval);
+}
+</script>
+{% endblock %}

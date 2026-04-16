@@ -1,0 +1,130 @@
+{% extends 'core/base.html' %}
+{% block title %}Attack Logs{% endblock %}
+{% block page_title %}📋 Attack Logs{% endblock %}
+{% block page_sub %}All intrusion events detected across federated nodes{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-ghost btn-sm" onclick="simulateAttack()">⚡ Simulate Attack</button>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.filter-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.filter-group{display:flex;flex-direction:column;gap:6px}
+.filter-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);font-weight:600}
+.filter-control{padding:8px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:'Space Grotesk',sans-serif}
+.filter-control:focus{outline:none;border-color:var(--accent)}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filter Bar -->
+<form method="get" class="filter-bar">
+  <div class="filter-group">
+    <label class="filter-label">Attack Type</label>
+    <select name="type" class="filter-control" onchange="this.form.submit()">
+      <option value="">All Types</option>
+      <option {% if type_filter == 'DoS' %}selected{% endif %}>DoS</option>
+      <option {% if type_filter == 'Port Scan' %}selected{% endif %}>Port Scan</option>
+      <option {% if type_filter == 'Brute Force' %}selected{% endif %}>Brute Force</option>
+      <option {% if type_filter == 'Botnet' %}selected{% endif %}>Botnet</option>
+      <option {% if type_filter == 'SQL Injection' %}selected{% endif %}>SQL Injection</option>
+      <option {% if type_filter == 'XSS' %}selected{% endif %}>XSS</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">Severity</label>
+    <select name="severity" class="filter-control" onchange="this.form.submit()">
+      <option value="">All Severities</option>
+      <option value="critical" {% if severity_filter == 'critical' %}selected{% endif %}>Critical</option>
+      <option value="high" {% if severity_filter == 'high' %}selected{% endif %}>High</option>
+      <option value="medium" {% if severity_filter == 'medium' %}selected{% endif %}>Medium</option>
+      <option value="low" {% if severity_filter == 'low' %}selected{% endif %}>Low</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">Client Node</label>
+    <select name="client" class="filter-control" onchange="this.form.submit()">
+      <option value="">All Clients</option>
+      {% for client in all_clients %}
+      <option value="{{ client.id }}" {% if client_filter == client.id|stringformat:"s" %}selected{% endif %}>{{ client.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <a href="/logs/" class="btn btn-ghost btn-sm">✕ Clear</a>
+  <span style="margin-left:auto;font-size:13px;color:var(--text3);align-self:center">{{ logs|length }} events</span>
+</form>
+
+<!-- Logs Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Client Node</th>
+        <th>Attack Type</th>
+        <th>Severity</th>
+        <th>Confidence</th>
+        <th>Source IP</th>
+        <th>Destination IP</th>
+        <th>Protocol</th>
+        <th>Bytes</th>
+        <th>Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td class="mono" style="font-size:11px;color:var(--text3);white-space:nowrap">{{ log.detected_at|date:"Y-m-d H:i:s" }}</td>
+        <td>
+          <span style="font-size:13px;font-weight:600;color:var(--text)">{{ log.client.name }}</span>
+        </td>
+        <td>
+          <span style="font-weight:600;color:
+            {% if log.attack_type == 'DoS' %}var(--red)
+            {% elif log.attack_type == 'Port Scan' %}var(--orange)
+            {% elif log.attack_type == 'Brute Force' %}var(--yellow)
+            {% elif log.attack_type == 'Botnet' %}var(--purple)
+            {% elif log.attack_type == 'SQL Injection' %}#ff6b6b
+            {% elif log.attack_type == 'XSS' %}#feca57
+            {% else %}var(--green){% endif %}">
+            {{ log.attack_type }}
+          </span>
+        </td>
+        <td><span class="sev sev-{{ log.severity }}">{{ log.severity }}</span></td>
+        <td class="mono">{{ log.probability|floatformat:0 }}%</td>
+        <td class="mono" style="font-size:11px">{{ log.source_ip|default:"—" }}</td>
+        <td class="mono" style="font-size:11px">{{ log.destination_ip|default:"—" }}</td>
+        <td class="mono" style="font-size:11px">{{ log.protocol|default:"—" }}</td>
+        <td class="mono">{% if log.bytes_transferred %}{{ log.bytes_transferred }}B{% else %}—{% endif %}</td>
+        <td class="mono">{% if log.duration %}{{ log.duration|floatformat:1 }}s{% else %}—{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="10" style="text-align:center;padding:40px;color:var(--text3)">
+          No attack logs found.
+          {% if severity_filter or type_filter or client_filter %}
+          <a href="/logs/" style="color:var(--accent)">Clear filters</a> or
+          {% endif %}
+          <a href="/training/" style="color:var(--accent)">run federated training</a> to generate logs.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function simulateAttack(){
+  const r = await fetch('/api/simulate-attack/', {headers:{'X-CSRFToken':CSRF}});
+  const d = await r.json();
+  if(d.status==='success'){
+    showToast(`⚠️ ${d.attack.client}: ${d.attack.type} detected!`, 'error');
+    setTimeout(()=>location.reload(), 1500);
+  }
+}
+</script>
+{% endblock %}

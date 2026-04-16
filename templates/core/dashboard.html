@@ -1,0 +1,261 @@
+{% extends 'core/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}📊 Dashboard{% endblock %}
+{% block page_sub %}Real-time federated intrusion detection overview{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-ghost btn-sm" onclick="simulateAttack()">⚡ Simulate Attack</button>
+<button class="btn btn-primary btn-sm" onclick="window.location='/training/'">▶ Run Training</button>
+{% endblock %}
+
+{% block content %}
+<!-- STAT CARDS -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-icon">🖥️</div>
+    <div class="stat-label">Active Clients</div>
+    <div class="stat-value" id="stat-clients">{{ total_clients }}</div>
+    <span class="stat-badge badge-green">● Online</span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">⚠️</div>
+    <div class="stat-label">Total Intrusions</div>
+    <div class="stat-value" id="stat-attacks">{{ total_attacks }}</div>
+    <span class="stat-badge badge-red">Detected</span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🔄</div>
+    <div class="stat-label">Federated Round</div>
+    <div class="stat-value" id="stat-round">{{ current_round }}</div>
+    <span class="stat-badge badge-blue">FL Round</span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🎯</div>
+    <div class="stat-label">Global Accuracy</div>
+    <div class="stat-value" id="stat-accuracy">{{ global_accuracy }}<span style="font-size:18px;color:var(--text3)">%</span></div>
+    <span class="stat-badge badge-purple">Global Model</span>
+  </div>
+</div>
+
+<!-- CHARTS ROW 1 -->
+<div class="grid-2">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Attack Trend (Last 7 Days)</div>
+        <div class="chart-sub">Detected intrusions per day</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Attack Type Distribution</div>
+        <div class="chart-sub">Breakdown by attack category</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="typeChart"></canvas></div>
+  </div>
+</div>
+
+<!-- CHARTS ROW 2 -->
+<div class="grid-2">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Federated Round Accuracy</div>
+        <div class="chart-sub">Global model improvement over rounds</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="roundChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Client Accuracy Comparison</div>
+        <div class="chart-sub">Local model performance per node</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="clientChart"></canvas></div>
+  </div>
+</div>
+
+<!-- LIVE ALERTS + PRIVACY -->
+<div class="grid-2">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Live Alerts</div>
+        <div class="chart-sub">Most recent detections</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="refreshAlerts()">↺ Refresh</button>
+    </div>
+    <div id="alerts-list">
+      {% for alert in recent_alerts %}
+      <div class="alert-item">
+        <div class="alert-dot {{ alert.severity }}"></div>
+        <div class="alert-text">
+          <strong>{{ alert.client.name }}</strong>: {{ alert.attack_type }} detected
+        </div>
+        <div class="alert-time">{{ alert.detected_at|time:"H:i:s" }}</div>
+      </div>
+      {% empty %}
+      <div style="text-align:center;color:var(--text3);padding:20px;font-size:13px">No alerts yet. Run training to generate detections.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">How Federated Learning Works</div>
+        <div class="chart-sub">Privacy-preserving architecture</div>
+      </div>
+    </div>
+    <div style="padding:8px 0">
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:24px"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px">Step 1: Local Training</div>
+          <div style="font-size:12px;color:var(--text3)">Each client trains on its <strong style="color:var(--text2)">local network data only</strong>. Raw packets never leave the node.</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:24px"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px">Step 2: Share Model Updates</div>
+          <div style="font-size:12px;color:var(--text3)">Only <strong style="color:var(--accent)">encrypted gradient updates</strong> (not data) are sent to the central server.</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:24px"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px">Step 3: FedAvg Aggregation</div>
+          <div style="font-size:12px;color:var(--text3)">Server aggregates updates using <strong style="color:var(--text2)">Federated Averaging</strong> to build a stronger global model.</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0">
+        <div style="font-size:24px"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px">Step 4: Global Model Distribution</div>
+          <div style="font-size:12px;color:var(--text3)">Updated global model is pushed back to all clients. <strong style="color:var(--green)">Privacy preserved throughout.</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const attackTypeData = {{ attack_type_data|safe }};
+const trendDates = {{ trend_dates|safe }};
+const trendCounts = {{ trend_counts|safe }};
+const roundLabels = {{ round_labels|safe }};
+const roundAccuracies = {{ round_accuracies|safe }};
+const clientNames = {{ client_names|safe }};
+const clientAccuracies = {{ client_accuracies|safe }};
+
+// Trend chart
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: trendDates,
+    datasets: [{
+      label: 'Attacks',
+      data: trendCounts,
+      borderColor: '#ff4757',
+      backgroundColor: 'rgba(255,71,87,0.1)',
+      fill: true,
+      tension: 0.4,
+      pointBackgroundColor: '#ff4757',
+      pointRadius: 4,
+    }]
+  },
+  options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'}},x:{grid:{color:'rgba(255,255,255,0.03)'}}}}
+});
+
+// Attack type donut
+const typeColors = ['#ff4757','#00d4ff','#ffa502','#a855f7','#00ff88','#ffd700'];
+new Chart(document.getElementById('typeChart'), {
+  type: 'doughnut',
+  data: {
+    labels: Object.keys(attackTypeData),
+    datasets: [{data: Object.values(attackTypeData), backgroundColor: typeColors, borderColor: '#0f1629', borderWidth: 2}]
+  },
+  options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{padding:12,font:{size:11}}}}}
+});
+
+// Round accuracy
+new Chart(document.getElementById('roundChart'), {
+  type: 'line',
+  data: {
+    labels: roundLabels,
+    datasets: [{
+      label: 'Global Accuracy %',
+      data: roundAccuracies,
+      borderColor: '#00d4ff',
+      backgroundColor: 'rgba(0,212,255,0.1)',
+      fill: true,
+      tension: 0.4,
+      pointBackgroundColor: '#00d4ff',
+      pointRadius: 4,
+    }]
+  },
+  options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false,min:70,max:100,grid:{color:'rgba(255,255,255,0.05)'}},x:{grid:{color:'rgba(255,255,255,0.03)'}}}}
+});
+
+// Client comparison bar
+new Chart(document.getElementById('clientChart'), {
+  type: 'bar',
+  data: {
+    labels: clientNames,
+    datasets: [{
+      label: 'Local Accuracy %',
+      data: clientAccuracies,
+      backgroundColor: ['rgba(0,212,255,0.6)','rgba(168,85,247,0.6)','rgba(0,255,136,0.6)','rgba(255,165,2,0.6)'],
+      borderColor: ['#00d4ff','#a855f7','#00ff88','#ffa502'],
+      borderWidth: 1,
+      borderRadius: 6,
+    }]
+  },
+  options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false,min:80,max:100,grid:{color:'rgba(255,255,255,0.05)'}},x:{grid:{display:false}}}}
+});
+
+async function simulateAttack(){
+  try {
+    const r = await fetch('/api/simulate-attack/', {headers:{'X-CSRFToken':CSRF}});
+    const d = await r.json();
+    if(d.status==='success'){
+      showToast(`⚠️ ${d.attack.client}: ${d.attack.type} detected!`, 'error');
+      setTimeout(refreshAlerts, 500);
+    }
+  } catch(e){ showToast('Error simulating attack','error'); }
+}
+
+async function refreshAlerts(){
+  const r = await fetch('/api/stats/');
+  const d = await r.json();
+  document.getElementById('stat-clients').textContent = d.total_clients;
+  document.getElementById('stat-attacks').textContent = d.total_attacks;
+  document.getElementById('stat-round').textContent = d.current_round;
+  document.getElementById('stat-accuracy').innerHTML = d.global_accuracy + '<span style="font-size:18px;color:var(--text3)">%</span>';
+
+  const sevColor = {critical:'critical',high:'high',medium:'medium',low:'low'};
+  const list = document.getElementById('alerts-list');
+  if(d.alerts.length){
+    list.innerHTML = d.alerts.map(a=>`
+      <div class="alert-item">
+        <div class="alert-dot ${a.severity}"></div>
+        <div class="alert-text"><strong>${a.client}</strong>: ${a.type} detected</div>
+        <div class="alert-time">${a.time}</div>
+      </div>
+    `).join('');
+  }
+}
+
+// Auto-refresh alerts every 30s
+setInterval(refreshAlerts, 30000);
+</script>
+{% endblock %}

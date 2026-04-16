@@ -1,0 +1,214 @@
+{% extends 'core/base.html' %}
+{% block title %}Client Nodes{% endblock %}
+{% block page_title %}🖥️ Client Nodes{% endblock %}
+{% block page_sub %}Federated learning participant nodes{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary btn-sm" onclick="showAddModal()">+ Add Node</button>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.client-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-bottom:28px}
+.client-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.2s}
+.client-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.client-card.active{border-top:2px solid var(--green)}
+.client-card.training{border-top:2px solid var(--accent)}
+.client-card.idle{border-top:2px solid var(--text3)}
+.client-card.offline{border-top:2px solid var(--red)}
+.client-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.client-name{font-size:15px;font-weight:700;color:var(--text)}
+.client-id{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.client-stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.client-stat:last-of-type{border-bottom:none}
+.client-stat-label{color:var(--text3)}
+.client-stat-val{color:var(--text);font-weight:600;font-family:'JetBrains Mono',monospace}
+.acc-bar{margin-top:14px}
+.acc-label{display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-bottom:6px}
+.progress{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-bar{height:100%;border-radius:4px;transition:width 1s ease}
+
+/* Network diagram */
+.network-diagram{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:28px;text-align:center}
+.network-title{font-size:15px;font-weight:600;margin-bottom:24px;color:var(--text)}
+.network-svg-wrap{overflow-x:auto}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card2);border:1px solid var(--border2);border-radius:16px;padding:28px;width:100%;max-width:400px;position:relative}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer}
+.modal-close:hover{color:var(--text)}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Network Diagram -->
+{% comment %} <div class="network-diagram">
+  <div class="network-title">🌐 Federated Network Topology — No Raw Data Shared</div>
+  <div class="network-svg-wrap">
+    <svg width="700" height="200" viewBox="0 0 700 200" style="max-width:100%;font-family:'Space Grotesk',sans-serif">
+      <!-- Central server -->
+      <rect x="285" y="60" width="130" height="60" rx="10" fill="#1a2240" stroke="#00d4ff" stroke-width="1.5"/>
+      <text x="350" y="86" text-anchor="middle" fill="#00d4ff" font-size="12" font-weight="600">🛡️ FL Server</text>
+      <text x="350" y="106" text-anchor="middle" fill="#5c6e90" font-size="10">FedAvg Aggregation</text> {% endcomment %}
+
+      <!-- Clients -->
+      {% comment %} {% for client in clients %}
+        {% if forloop.counter == 1 %}
+          <rect x="30" y="70" width="120" height="50" rx="8" fill="#131929" stroke="#00ff88" stroke-width="1"/>
+          <text x="90" y="92" text-anchor="middle" fill="#e8eeff" font-size="11" font-weight="600">{{ client.name|truncatechars:14 }}</text>
+          <text x="90" y="108" text-anchor="middle" fill="#5c6e90" font-size="10">Acc: {{ client.local_accuracy }}%</text>
+          <line x1="150" y1="95" x2="285" y2="90" stroke="#243352" stroke-width="1.5" stroke-dasharray="6,4"/>
+          <text x="217" y="82" text-anchor="middle" fill="#00d4ff" font-size="9">model updates only</text>
+        {% elif forloop.counter == 2 %}
+          <rect x="550" y="70" width="120" height="50" rx="8" fill="#131929" stroke="#a855f7" stroke-width="1"/>
+          <text x="610" y="92" text-anchor="middle" fill="#e8eeff" font-size="11" font-weight="600">{{ client.name|truncatechars:14 }}</text>
+          <text x="610" y="108" text-anchor="middle" fill="#5c6e90" font-size="10">Acc: {{ client.local_accuracy }}%</text>
+          <line x1="550" y1="95" x2="415" y2="90" stroke="#243352" stroke-width="1.5" stroke-dasharray="6,4"/>
+        {% elif forloop.counter == 3 %}
+          <rect x="180" y="148" width="120" height="50" rx="8" fill="#131929" stroke="#ffa502" stroke-width="1"/>
+          <text x="240" y="170" text-anchor="middle" fill="#e8eeff" font-size="11" font-weight="600">{{ client.name|truncatechars:14 }}</text>
+          <text x="240" y="186" text-anchor="middle" fill="#5c6e90" font-size="10">Acc: {{ client.local_accuracy }}%</text>
+          <line x1="270" y1="148" x2="320" y2="120" stroke="#243352" stroke-width="1.5" stroke-dasharray="6,4"/>
+        {% elif forloop.counter == 4 %}
+          <rect x="400" y="148" width="120" height="50" rx="8" fill="#131929" stroke="#ffd700" stroke-width="1"/>
+          <text x="460" y="170" text-anchor="middle" fill="#e8eeff" font-size="11" font-weight="600">{{ client.name|truncatechars:14 }}</text>
+          <text x="460" y="186" text-anchor="middle" fill="#5c6e90" font-size="10">Acc: {{ client.local_accuracy }}%</text>
+          <line x1="430" y1="148" x2="380" y2="120" stroke="#243352" stroke-width="1.5" stroke-dasharray="6,4"/>
+        {% endif %}
+      {% endfor %}
+      <!-- Legend -->
+      <text x="350" y="195" text-anchor="middle" fill="#3a4a6a" font-size="10">⚡ Raw network data stays local — only encrypted gradients travel</text>
+    </svg>
+  </div>
+</div> {% endcomment %}
+
+<!-- Client Cards -->
+<div class="client-grid">
+  {% for client in clients %}
+  <div class="client-card {{ client.status }}">
+    <div class="client-header">
+      <div>
+        <div class="client-name">{{ client.name }}</div>
+        <div class="client-id">{{ client.ip_address }}</div>
+      </div>
+      <span class="status-dot status-{{ client.status }}">{{ client.get_status_display }}</span>
+    </div>
+    <div class="client-stat">
+      <span class="client-stat-label">Local Samples</span>
+      <span class="client-stat-val">{{ client.local_samples|floatformat:0 }}</span>
+    </div>
+    <div class="client-stat">
+      <span class="client-stat-label">Local Accuracy</span>
+      <span class="client-stat-val">{{ client.local_accuracy }}%</span>
+    </div>
+    <div class="client-stat">
+      <span class="client-stat-label">Last Seen</span>
+      <span class="client-stat-val">{{ client.last_seen|timesince }} ago</span>
+    </div>
+    <div class="client-stat">
+      <span class="client-stat-label">Attack Logs</span>
+      <span class="client-stat-val">{{ client.attack_logs.count }}</span>
+    </div>
+    <div class="acc-bar">
+      <div class="acc-label">
+        <span>Local Model Accuracy</span>
+        <span>{{ client.local_accuracy }}%</span>
+      </div>
+      <div class="progress">
+        <div class="progress-bar" style="width:{{ client.local_accuracy }}%;background:{% if client.local_accuracy > 93 %}var(--green){% elif client.local_accuracy > 88 %}var(--accent){% else %}var(--orange){% endif %}"></div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">
+    No client nodes yet. <button class="btn btn-primary btn-sm" onclick="showAddModal()" style="margin-left:10px">Add First Node</button>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Clients Table -->
+{% if clients %}
+<div class="chart-card">
+  <div class="chart-header">
+    <div class="chart-title">All Client Nodes — Details</div>
+  </div>
+  <div class="table-wrap" style="border:none;border-radius:0">
+    <table>
+      <thead>
+        <tr>
+          <th>Node Name</th>
+          <th>IP Address</th>
+          <th>Status</th>
+          <th>Samples</th>
+          <th>Local Accuracy</th>
+          <th>Attack Logs</th>
+          <th>Last Seen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for client in clients %}
+        <tr>
+          <td><strong>{{ client.name }}</strong></td>
+          <td class="mono">{{ client.ip_address }}</td>
+          <td><span class="status-dot status-{{ client.status }}">{{ client.get_status_display }}</span></td>
+          <td class="mono">{{ client.local_samples }}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="progress" style="width:80px"><div class="progress-bar" style="width:{{ client.local_accuracy }}%"></div></div>
+              <span class="mono">{{ client.local_accuracy }}%</span>
+            </div>
+          </td>
+          <td class="mono">{{ client.attack_logs.count }}</td>
+          <td style="color:var(--text3)">{{ client.last_seen|timesince }} ago</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Add Client Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <button class="modal-close" onclick="hideAddModal()">✕</button>
+    <div class="modal-title">➕ Add Client Node</div>
+    <div class="form-group">
+      <label class="form-label">Node Name</label>
+      <input type="text" id="nodeName" class="form-control" placeholder="e.g. Hospital Node Alpha">
+    </div>
+    <div class="form-group">
+      <label class="form-label">IP Address</label>
+      <input type="text" id="nodeIP" class="form-control" placeholder="e.g. 192.168.1.20">
+    </div>
+    <div style="display:flex;gap:12px;margin-top:20px">
+      <button class="btn btn-ghost" onclick="hideAddModal()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="addNode()" style="flex:1">Add Node</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showAddModal(){ document.getElementById('addModal').classList.add('show') }
+function hideAddModal(){ document.getElementById('addModal').classList.remove('show') }
+async function addNode(){
+  const name = document.getElementById('nodeName').value.trim();
+  const ip = document.getElementById('nodeIP').value.trim();
+  if(!name){ showToast('Node name is required','error'); return }
+  const r = await apiPost('/api/add-client/', {name, ip: ip||'192.168.1.100'});
+  if(r.status==='success'){
+    showToast(`✅ ${r.name} added successfully`,'success');
+    hideAddModal();
+    setTimeout(()=>location.reload(), 1000);
+  } else {
+    showToast(r.message||'Error adding node','error');
+  }
+}
+document.getElementById('addModal').addEventListener('click', function(e){ if(e.target===this) hideAddModal() });
+</script>
+{% endblock %}

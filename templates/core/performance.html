@@ -1,0 +1,187 @@
+{% extends 'core/base.html' %}
+{% block title %}Model Performance{% endblock %}
+{% block page_title %}📈 Model Performance{% endblock %}
+{% block page_sub %}Global federated model evaluation metrics{% endblock %}
+
+{% block extra_head %}
+<style>
+.metric-big{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;position:relative;overflow:hidden}
+.metric-big::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.metric-big.acc::before{background:var(--accent)}
+.metric-big.prec::before{background:var(--purple)}
+.metric-big.rec::before{background:var(--green)}
+.metric-big.f1::before{background:var(--orange)}
+.metric-big-val{font-size:48px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1;margin:12px 0 6px}
+.metric-big-label{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:600}
+.metric-big-desc{font-size:12px;color:var(--text3);margin-top:4px}
+.cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;max-width:280px;margin:0 auto}
+.cm-cell{padding:16px;border-radius:6px;text-align:center;font-weight:700;font-family:'JetBrains Mono',monospace}
+.cm-tp{background:rgba(0,255,136,0.2);color:var(--green)}
+.cm-tn{background:rgba(0,212,255,0.2);color:var(--accent)}
+.cm-fp{background:rgba(255,71,87,0.15);color:var(--red)}
+.cm-fn{background:rgba(255,165,2,0.15);color:var(--orange)}
+.cm-label{font-size:10px;display:block;margin-top:4px;font-weight:400;opacity:0.8}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Metric Cards -->
+<div class="stat-grid" style="margin-bottom:24px">
+  <div class="metric-big acc">
+    <div class="metric-big-label">Accuracy</div>
+    <div class="metric-big-val" style="color:var(--accent)">
+      {% if latest_round %}{{ latest_round.global_accuracy }}%{% else %}—{% endif %}
+    </div>
+    <div class="metric-big-desc">% of correct predictions</div>
+  </div>
+  <div class="metric-big prec">
+    <div class="metric-big-label">Precision</div>
+    <div class="metric-big-val" style="color:var(--purple)">
+      {% if latest_round %}{{ latest_round.precision }}%{% else %}—{% endif %}
+    </div>
+    <div class="metric-big-desc">True attacks / predicted attacks</div>
+  </div>
+  <div class="metric-big rec">
+    <div class="metric-big-label">Recall</div>
+    <div class="metric-big-val" style="color:var(--green)">
+      {% if latest_round %}{{ latest_round.recall }}%{% else %}—{% endif %}
+    </div>
+    <div class="metric-big-desc">True attacks / actual attacks</div>
+  </div>
+  <div class="metric-big f1">
+    <div class="metric-big-label">F1 Score</div>
+    <div class="metric-big-val" style="color:var(--orange)">
+      {% if latest_round %}{{ latest_round.f1_score }}%{% else %}—{% endif %}
+    </div>
+    <div class="metric-big-desc">Harmonic mean of P & R</div>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:24px">
+  <!-- Line charts -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Accuracy & F1 Over Rounds</div>
+        <div class="chart-sub">Model quality improvement across FL rounds</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="perfChart"></canvas></div>
+  </div>
+
+  <!-- Confusion Matrix -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Confusion Matrix</div>
+        <div class="chart-sub">Latest round — predicted vs actual</div>
+      </div>
+    </div>
+    <div style="padding:16px 0">
+      <div style="text-align:center;margin-bottom:12px">
+        <div style="display:inline-flex;gap:8px;font-size:11px;color:var(--text3)">
+          <span>← Predicted →</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:4px;max-width:300px;margin:0 auto;align-items:center">
+        <div></div>
+        <div style="text-align:center;font-size:11px;color:var(--text3);padding:4px;font-weight:600">Attack</div>
+        <div style="text-align:center;font-size:11px;color:var(--text3);padding:4px;font-weight:600">Normal</div>
+
+        <div style="font-size:11px;color:var(--text3);writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;padding:4px">Attack</div>
+        <div class="cm-cell cm-tp" id="cm-tp">
+          —<span class="cm-label">True Positive</span>
+        </div>
+        <div class="cm-cell cm-fp" id="cm-fp">
+          —<span class="cm-label">False Positive</span>
+        </div>
+
+        <div style="font-size:11px;color:var(--text3);writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;padding:4px">Normal</div>
+        <div class="cm-cell cm-fn" id="cm-fn">
+          —<span class="cm-label">False Negative</span>
+        </div>
+        <div class="cm-cell cm-tn" id="cm-tn">
+          —<span class="cm-label">True Negative</span>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:center;gap:16px;margin-top:16px;flex-wrap:wrap">
+        {% if perf %}
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace">{{ perf.true_positives }}</div>
+          <div style="font-size:11px;color:var(--text3)">TP</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">{{ perf.true_negatives }}</div>
+          <div style="font-size:11px;color:var(--text3)">TN</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--red);font-family:'JetBrains Mono',monospace">{{ perf.false_positives }}</div>
+          <div style="font-size:11px;color:var(--text3)">FP</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--orange);font-family:'JetBrains Mono',monospace">{{ perf.false_negatives }}</div>
+          <div style="font-size:11px;color:var(--text3)">FN</div>
+        </div>
+        {% else %}
+        <div style="color:var(--text3);font-size:13px">No performance data yet. Run federated training first.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Metrics explanation -->
+<div class="chart-card">
+  <div class="chart-header"><div class="chart-title"> Metrics Guide</div></div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:8px">
+    <div style="padding:14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent)">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px">Accuracy</div>
+      <div style="font-size:12px;color:var(--text3)">Overall correctness of the model.<br><code style="color:var(--text2)">(TP+TN) / Total</code></div>
+    </div>
+    <div style="padding:14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--purple)">
+      <div style="font-size:13px;font-weight:700;color:var(--purple);margin-bottom:6px">Precision</div>
+      <div style="font-size:12px;color:var(--text3)">How many flagged items are real attacks.<br><code style="color:var(--text2)">TP / (TP+FP)</code></div>
+    </div>
+    <div style="padding:14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--green)">
+      <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px">Recall</div>
+      <div style="font-size:12px;color:var(--text3)">How many real attacks were caught.<br><code style="color:var(--text2)">TP / (TP+FN)</code></div>
+    </div>
+    <div style="padding:14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--orange)">
+      <div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:6px">F1 Score</div>
+      <div style="font-size:12px;color:var(--text3)">Balance of precision & recall.<br><code style="color:var(--text2)">2×P×R / (P+R)</code></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const roundLabels = {{ round_labels|safe }};
+const roundAccuracies = {{ round_accuracies|safe }};
+const roundF1 = {{ round_f1|safe }};
+const cmData = {{ cm_data|safe }};
+
+new Chart(document.getElementById('perfChart'), {
+  type: 'line',
+  data: {
+    labels: roundLabels,
+    datasets: [
+      {label:'Accuracy',data:roundAccuracies,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.08)',fill:true,tension:0.4,pointRadius:4},
+      {label:'F1 Score',data:roundF1,borderColor:'#ffa502',backgroundColor:'rgba(255,165,2,0.08)',fill:true,tension:0.4,pointRadius:4},
+    ]
+  },
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{padding:12,font:{size:11}}}},
+    scales:{y:{min:70,max:100,grid:{color:'rgba(255,255,255,0.05)'}},x:{grid:{color:'rgba(255,255,255,0.03)'}}}}
+});
+
+// Populate confusion matrix cells
+if(cmData.length === 2){
+  document.getElementById('cm-tp').innerHTML = `${cmData[0][0]}<span class="cm-label">True Positive</span>`;
+  document.getElementById('cm-fp').innerHTML = `${cmData[0][1]}<span class="cm-label">False Positive</span>`;
+  document.getElementById('cm-fn').innerHTML = `${cmData[1][0]}<span class="cm-label">False Negative</span>`;
+  document.getElementById('cm-tn').innerHTML = `${cmData[1][1]}<span class="cm-label">True Negative</span>`;
+}
+</script>
+{% endblock %}

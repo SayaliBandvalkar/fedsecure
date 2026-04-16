@@ -1,0 +1,252 @@
+{% extends 'core/base.html' %}
+{% block title %}Intrusion Detection{% endblock %}
+{% block page_title %}🔍 Intrusion Detection{% endblock %}
+{% block page_sub %}Analyze network traffic samples using the global federated model{% endblock %}
+
+{% block extra_head %}
+<style>
+.detection-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.input-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.result-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;display:flex;flex-direction:column}
+.result-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--text3);padding:40px 0}
+.result-placeholder-icon{font-size:48px;margin-bottom:16px;opacity:0.5}
+.prediction-badge{font-size:28px;font-weight:700;padding:16px 24px;border-radius:12px;text-align:center;margin:16px 0}
+.prediction-badge.attack{background:rgba(255,71,87,0.15);color:var(--red);border:1px solid rgba(255,71,87,0.4)}
+.prediction-badge.normal{background:rgba(0,255,136,0.15);color:var(--green);border:1px solid rgba(0,255,136,0.4)}
+.confidence-ring{text-align:center;margin:16px 0}
+.score-bar{display:flex;align-items:center;gap:12px;margin:6px 0;font-size:13px}
+.score-label{width:110px;color:var(--text2);text-align:right;font-size:12px}
+.score-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.score-fill{height:100%;border-radius:4px;transition:width 0.8s ease}
+.score-val{width:44px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text3)}
+.tab-group{display:flex;gap:4px;background:var(--bg2);border-radius:8px;padding:4px;margin-bottom:20px}
+.tab-btn{flex:1;padding:8px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;border-radius:6px;font-family:'Space Grotesk',sans-serif;transition:all 0.2s}
+.tab-btn.active{background:var(--card2);color:var(--text)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.upload-area{border:2px dashed var(--border2);border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:border-color 0.2s;background:var(--bg3)}
+.upload-area:hover{border-color:var(--accent)}
+.upload-area input{display:none}
+.sample-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.sample-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:all 0.2s}
+.sample-btn:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="detection-grid">
+  <!-- Input Panel -->
+  <div class="input-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:16px">Network Traffic Input</h3>
+
+    <div class="tab-group">
+      <button class="tab-btn active" onclick="switchTab('manual',this)">Manual Input</button>
+      <button class="tab-btn" onclick="switchTab('upload',this)">Upload CSV</button>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="detectionForm">
+      {% csrf_token %}
+
+      <!-- Manual Input Tab -->
+      <div class="tab-pane active" id="tab-manual">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:14px">
+          Enter network traffic features. Use sample presets to test different attack types.
+        </p>
+        <div class="sample-btns">
+          <span style="font-size:11px;color:var(--text3);padding:6px 0">Quick samples:</span>
+          <button type="button" class="sample-btn" onclick="loadSample('dos')">DoS</button>
+          <button type="button" class="sample-btn" onclick="loadSample('portscan')">Port Scan</button>
+          <button type="button" class="sample-btn" onclick="loadSample('brute')">Brute Force</button>
+          <button type="button" class="sample-btn" onclick="loadSample('botnet')">Botnet</button>
+          <button type="button" class="sample-btn" onclick="loadSample('normal')">Normal</button>
+        </div>
+        <br>
+        <div class="feature-grid">
+          <div class="form-group">
+            <label class="form-label">Duration (sec)</label>
+            <input type="number" name="duration" id="f_duration" class="form-control" placeholder="0.5" step="0.01" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bytes Transferred</label>
+            <input type="number" name="bytes" id="f_bytes" class="form-control" placeholder="1024" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Packet Count</label>
+            <input type="number" name="packets" id="f_packets" class="form-control" placeholder="10" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Destination Port</label>
+            <input type="number" name="port" id="f_port" class="form-control" placeholder="80" min="0" max="65535">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Protocol</label>
+            <select name="protocol" id="f_protocol" class="form-control">
+              <option>TCP</option><option>UDP</option><option>ICMP</option><option>HTTP</option><option>HTTPS</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">TCP Flags</label>
+            <input type="number" name="flags" id="f_flags" class="form-control" placeholder="2" min="0" max="63">
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload CSV Tab -->
+      <div class="tab-pane" id="tab-upload">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:14px">
+          Upload a CSV file with columns: duration, bytes, packets, port, protocol, flags
+        </p>
+        <label class="upload-area" for="csvFile">
+          <input type="file" name="csv_file" id="csvFile" accept=".csv" onchange="showFilename(this)">
+          <div style="font-size:32px;margin-bottom:10px">📂</div>
+          <div style="font-size:14px;color:var(--text2);font-weight:600" id="uploadLabel">Click to upload CSV file</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">or drag and drop</div>
+        </label>
+        <div style="margin-top:14px;padding:12px;background:var(--bg2);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)">
+          <div style="color:var(--text2);margin-bottom:4px">Example CSV format:</div>
+          duration,bytes,packets,port,protocol,flags<br>
+          0.5,1024,10,80,TCP,2<br>
+          120,500000,800,80,UDP,0
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px">
+        🔍 Analyze Traffic
+      </button>
+    </form>
+  </div>
+
+  <!-- Result Panel -->
+  <div class="result-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:16px">Detection Result</h3>
+
+    {% if prediction %}
+    <div>
+      <div style="text-align:center;margin-bottom:8px">
+        <div style="font-size:13px;color:var(--text3)">Global FL Model Prediction</div>
+      </div>
+
+      <div class="prediction-badge {% if prediction.is_attack %}attack{% else %}normal{% endif %}">
+        {% if prediction.is_attack %}⚠️{% else %}✅{% endif %}
+        {{ prediction.attack_type }}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">
+        <div style="text-align:center;background:var(--bg3);padding:14px;border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:{% if prediction.confidence > 80 %}var(--red){% elif prediction.confidence > 60 %}var(--orange){% else %}var(--green){% endif %}">
+            {{ prediction.confidence }}%
+          </div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Confidence</div>
+        </div>
+        <div style="text-align:center;background:var(--bg3);padding:14px;border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:28px;font-weight:700;">
+            {% if prediction.severity == 'critical' %}🔴
+            {% elif prediction.severity == 'high' %}🟠
+            {% elif prediction.severity == 'medium' %}🟡
+            {% else %}🟢{% endif %}
+          </div>
+          <div style="font-size:13px;font-weight:700;color:{% if prediction.severity == 'critical' %}var(--red){% elif prediction.severity == 'high' %}var(--orange){% elif prediction.severity == 'medium' %}var(--yellow){% else %}var(--green){% endif %}">
+            {{ prediction.severity|title }}
+          </div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Severity</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">All Class Probabilities</div>
+        {% for k, v in prediction.all_scores.items %}
+        <div class="score-bar">
+          <span class="score-label">{{ k }}</span>
+          <div class="score-track">
+            <div class="score-fill" style="width:{{ v }}%;background:{% if k == prediction.attack_type %}{% if prediction.is_attack %}var(--red){% else %}var(--green){% endif %}{% else %}var(--border2){% endif %}"></div>
+          </div>
+          <span class="score-val">{{ v }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% comment %} <div style="margin-top:16px;padding:12px;background:var(--bg2);border-radius:8px;font-size:12px;color:var(--text3)">
+        💡 This prediction is made by the <strong style="color:var(--text2)">federated global model</strong> — trained across all nodes without accessing raw data from any single client.
+      </div> {% endcomment %}
+    </div>
+    {% else %}
+    <div class="result-placeholder">
+      <div class="result-placeholder-icon">🔎</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text2);margin-bottom:8px">Awaiting Traffic Sample</div>
+      <div style="font-size:13px">Enter network features on the left or upload a CSV file, then click <strong>Analyze Traffic</strong></div>
+      <div style="margin-top:20px;font-size:12px;color:var(--text3)">
+        The global federated model has been trained across distributed nodes using<br>privacy-preserving gradient aggregation.
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- How it works -->
+<div class="chart-card" style="margin-top:20px">
+  <div class="chart-header">
+    <div class="chart-title"> How the Detection Works</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:8px">
+    <div style="text-align:center;padding:16px;background:var(--bg3);border-radius:8px">
+      <div style="font-size:28px;margin-bottom:8px">📥</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">Input Features</div>
+      <div style="font-size:12px;color:var(--text3)">Network traffic characteristics: bytes, packets, ports, duration</div>
+    </div>
+    <div style="text-align:center;padding:16px;background:var(--bg3);border-radius:8px">
+      <div style="font-size:28px;margin-bottom:8px">🔄</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">Feature Extraction</div>
+      <div style="font-size:12px;color:var(--text3)">Normalized and processed by the FL global model pipeline</div>
+    </div>
+    <div style="text-align:center;padding:16px;background:var(--bg3);border-radius:8px">
+      <div style="font-size:28px;margin-bottom:8px">🤖</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">FL Global Model</div>
+      <div style="font-size:12px;color:var(--text3)">FedAvg-aggregated model classifies traffic into attack categories</div>
+    </div>
+    <div style="text-align:center;padding:16px;background:var(--bg3);border-radius:8px">
+      <div style="font-size:28px;margin-bottom:8px">📊</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">Prediction + Confidence</div>
+      <div style="font-size:12px;color:var(--text3)">Attack type, severity level, and probability scores returned</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const samples = {
+  dos: {duration:120, bytes:800000, packets:9500, port:80, protocol:'UDP', flags:0},
+  portscan: {duration:3, bytes:450, packets:280, port:22, protocol:'TCP', flags:2},
+  brute: {duration:45, bytes:12000, packets:180, port:22, protocol:'TCP', flags:18},
+  botnet: {duration:3600, bytes:3200, packets:45, port:6667, protocol:'TCP', flags:24},
+  normal: {duration:2, bytes:8500, packets:12, port:443, protocol:'HTTPS', flags:16},
+};
+
+function loadSample(type){
+  const s = samples[type];
+  document.getElementById('f_duration').value = s.duration;
+  document.getElementById('f_bytes').value = s.bytes;
+  document.getElementById('f_packets').value = s.packets;
+  document.getElementById('f_port').value = s.port;
+  document.getElementById('f_protocol').value = s.protocol;
+  document.getElementById('f_flags').value = s.flags;
+  showToast(`Loaded ${type.toUpperCase()} sample`, 'info');
+}
+
+function switchTab(name, btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function showFilename(input){
+  const label = document.getElementById('uploadLabel');
+  if(input.files.length > 0){
+    label.textContent = '📄 ' + input.files[0].name;
+  }
+}
+</script>
+{% endblock %}
