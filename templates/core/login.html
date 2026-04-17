@@ -14,7 +14,20 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 .bg-glow2{position:fixed;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.06) 0%,transparent 70%);bottom:-150px;left:-150px;pointer-events:none}
 .login-wrap{position:relative;z-index:10;width:100%;max-width:420px;padding:20px}
 .brand{text-align:center;margin-bottom:36px}
-.brand-icon{width:64px;height:64px;background:linear-gradient(135deg,var(--accent),var(--purple));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px}
+{% comment %} .brand-icon{width:64px;height:64px;background:linear-gradient(135deg,var(--accent),var(--purple));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px} {% endcomment %}
+.brand-icon {
+  width:64px;
+  height:64px;
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.brand-icon img {
+  width:36px;
+  height:36px;
+}
 .brand-name{font-size:28px;font-weight:700;letter-spacing:-0.5px}
 .brand-sub{font-size:13px;color:var(--text3);margin-top:4px;font-family:'JetBrains Mono',monospace}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;position:relative;overflow:hidden}
@@ -43,7 +56,10 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 
 <div class="login-wrap">
   <div class="brand">
-    <div class="brand-icon">🛡️</div>
+    {% comment %} <div class="brand-icon">🛡️</div> {% endcomment %}
+    <div class="brand-icon">
+  <img src="{% static 'favicon.svg' %}" alt="Logo" style="width:40px;height:40px;">
+</div>
     <div class="brand-name">FedSecure</div>
     <div class="brand-sub">Privacy-Preserving Intrusion Detection System</div>
   </div>
