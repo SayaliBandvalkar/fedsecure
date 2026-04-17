@@ -17,6 +17,7 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ALLOWED_HOSTS = ['*']
 
+
 # ALLOWED_HOSTS = ['*', 'fedsecure.onrender.com']
 
 # ALLOWED_HOSTS = ['fedsecure.onrender.com', 'localhost', '127.0.0.1']
@@ -27,7 +28,7 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 # ]
 
 ALLOWED_HOSTS = [
-    "fedsecure.onrender.com",
+    "fedsecure-1.onrender.com",
     ".onrender.com",
     "127.0.0.1",
     "localhost"
@@ -110,8 +111,8 @@ WSGI_APPLICATION = 'fedsecure.wsgi.application'
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL:
     DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
             conn_max_age=600,
             ssl_require=True
         )
