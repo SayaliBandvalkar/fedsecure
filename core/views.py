@@ -12,20 +12,43 @@ import json
 import random
 
 
+# def login_view(request):
+#     if request.user.is_authenticated:
+#         return redirect('dashboard')
+#     if request.method == 'POST':
+#         username = request.POST.get('username')
+#         password = request.POST.get('password')
+#         user = authenticate(request, username=username, password=password)
+#         if user:
+#             login(request, user)
+#             return redirect('dashboard')
+#         else:
+#             messages.error(request, 'Invalid credentials. Please try again.')
+#     return render(request, 'core/login.html')
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
+
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
+
         user = authenticate(request, username=username, password=password)
-        if user:
+
+        if user is not None:
             login(request, user)
-            return redirect('dashboard')
+
+            # 🔥 Role-based access
+            if user.is_superuser:
+                return redirect('/admin/')   # Admin → Django admin panel
+            else:
+                return redirect('dashboard')  # Analyst → your dashboard
+
         else:
             messages.error(request, 'Invalid credentials. Please try again.')
-    return render(request, 'core/login.html')
 
+    return render(request, 'core/login.html')
 
 def logout_view(request):
     logout(request)
