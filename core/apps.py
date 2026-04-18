@@ -75,11 +75,11 @@ class CoreConfig(AppConfig):
         from .signals import connect_training_signal
         connect_training_signal()
 
-        # create user
-        from django.contrib.auth.models import User
+        # # create user
+        # from django.contrib.auth.models import User
 
-        if not User.objects.filter(username='analyst').exists():
-            User.objects.create_user(
-                username='analyst',
-                password='analyst123'
-            )
+        # if not User.objects.filter(username='analyst').exists():
+        #     User.objects.create_user(
+        #         username='analyst',
+        #         password='analyst123'
+        #     )
