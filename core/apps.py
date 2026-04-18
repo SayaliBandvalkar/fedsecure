@@ -64,16 +64,16 @@
 
 
 
-from django.apps import AppConfig
+# from django.apps import AppConfig
 
-class CoreConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'core'
+# class CoreConfig(AppConfig):
+#     default_auto_field = 'django.db.models.BigAutoField'
+#     name = 'core'
 
-    def ready(self):
-        # your signal
-        from .signals import connect_training_signal
-        connect_training_signal()
+#     def ready(self):
+#         # your signal
+#         from .signals import connect_training_signal
+#         connect_training_signal()
 
         # # create user
         # from django.contrib.auth.models import User
@@ -83,3 +83,41 @@ class CoreConfig(AppConfig):
         #         username='analyst',
         #         password='analyst123'
         #     )
+        
+        
+        
+        
+        
+        
+        
+from django.apps import AppConfig
+
+class CoreConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'core'
+
+    def ready(self):
+        from .signals import connect_training_signal
+        connect_training_signal()
+
+        # 🔥 CREATE USERS SAFELY (RUNS ON START)
+        from django.contrib.auth.models import User
+
+        # Analyst
+        if not User.objects.filter(username='analyst').exists():
+            analyst = User.objects.create_user(
+                username='analyst',
+                password='analyst123'
+            )
+            analyst.is_active = True
+            analyst.save()
+
+        # Admin
+        if not User.objects.filter(username='admin').exists():
+            admin = User.objects.create_superuser(
+                username='admin',
+                password='admin123',
+                email='admin@example.com'
+            )
+            admin.is_active = True
+            admin.save()        
