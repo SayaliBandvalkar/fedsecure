@@ -236,6 +236,18 @@ def performance(request):
 
 # ---- API Endpoints ----
 
+# @login_required
+# @require_POST
+# def api_run_training(request):
+#     try:
+#         data = json.loads(request.body)
+#         rounds = int(data.get('rounds', 5))
+#         rounds = min(max(rounds, 1), 20)
+#         result = run_federated_simulation(rounds)
+#         return JsonResponse({'status': 'success', 'result': result})
+#     except Exception as e:
+#         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
 @login_required
 @require_POST
 def api_run_training(request):
@@ -243,8 +255,19 @@ def api_run_training(request):
         data = json.loads(request.body)
         rounds = int(data.get('rounds', 5))
         rounds = min(max(rounds, 1), 20)
-        result = run_federated_simulation(rounds)
+
+        # ✅ CREATE SESSION FIRST
+        session = TrainingSession.objects.create(
+            status='running',
+            total_rounds=rounds,
+            current_round=0
+        )
+
+        # ✅ PASS session_id
+        result = run_federated_simulation(rounds, session.id)
+
         return JsonResponse({'status': 'success', 'result': result})
+
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
